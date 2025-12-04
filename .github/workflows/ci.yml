@@ -2,14 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
   test-build-push:
     runs-on: ubuntu-latest
 
-    # Разрешаем workflow публиковать контейнеры в GHCR
+    # Needed so the workflow can push images to GHCR
     permissions:
       contents: read
       packages: write
@@ -36,14 +37,17 @@ jobs:
         run: pytest
 
       - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Build Docker image
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/iris-streamlit:latest
-          docker build -t $IMAGE_NAME .
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Push Docker image
+      - name: Build and push Docker image
+        env:
+          IMAGE_REPO: iris-streamlit
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/iris-streamlit:latest
-          docker push $IMAGE_NAME
+          # Make owner name lowercase for GHCR
+          OWNER_LC=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME=ghcr.io/${OWNER_LC}/${IMAGE_REPO}:latest
+          echo "Using image name: $IMAGE_NAME"
+
+          docker build -t "$IMAGE_NAME" .
+          docker push "$IMAGE_NAME"
